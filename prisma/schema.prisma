@@ -1,0 +1,280 @@
+// Buildwise database schema
+//
+// Geometry storage decision
+// -------------------------
+// The building (site, levels, rooms, walls, doors, windows, stairs, roof,
+// material selections) is stored as an immutable, schema-versioned document in
+// `DesignVersion.model`, validated on the server against the TypeScript/Zod
+// building model (src/domain/model). This mirrors how BIM formats (IFC) treat a
+// design: one coherent snapshot per version, so restoring or comparing versions
+// is atomic and the 2D plan, 3D view, quantities and cost can never drift apart.
+// Derived, queryable figures (areas, cost totals) are denormalised onto the
+// version row for listing and reporting.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MeasurementSystem {
+  metric
+  imperial
+}
+
+/// Maturity of a design. Never advanced to PROFESSIONALLY_REVIEWED or
+/// CONSTRUCTION_DOCUMENTATION without a real review record.
+enum DesignStage {
+  CONCEPT
+  DETAILED_DESIGN
+  PROFESSIONALLY_REVIEWED
+  CONSTRUCTION_DOCUMENTATION
+}
+
+enum DataStatus {
+  sample
+  partner_supplied
+  verified
+}
+
+enum ProfessionalCategory {
+  ARCHITECT
+  STRUCTURAL_ENGINEER
+  MEP_ENGINEER
+  QUANTITY_SURVEYOR
+  CONTRACTOR
+  INTERIOR_DESIGNER
+  BUILDER
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+}
+
+enum ReviewStatus {
+  REQUESTED
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  CANCELLED
+}
+
+model User {
+  id                String            @id @default(cuid())
+  email             String            @unique
+  name              String
+  passwordHash      String
+  emailVerifiedAt   DateTime?
+  passwordChangedAt DateTime?
+  locale            String            @default("en")
+  measurementSystem MeasurementSystem @default(metric)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  sessions          Session[]
+  projects          Project[]
+  versions          DesignVersion[]
+  reviewRequests    ReviewRequest[]
+  authTokens        AuthToken[]
+}
+
+enum AuthTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+/// Single-use tokens for email verification and password reset. Only the SHA-256 hash is stored.
+model AuthToken {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   AuthTokenPurpose
+  tokenHash String           @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, purpose])
+}
+
+/// Fixed-window rate-limit counters, stored in the database so limits hold across server instances.
+model RateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+}
+
+/// Opaque session tokens; only the SHA-256 hash is stored.
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Region {
+  id                String            @id
+  country           String
+  countryCode       String
+  subdivision       String
+  city              String
+  currency          String
+  measurementSystem MeasurementSystem
+  locale            String
+  /// Climate, construction practice, planning defaults, rates, regulatory references
+  data              Json
+  dataStatus        DataStatus        @default(sample)
+  dataAsOf          DateTime
+  projects          Project[]
+  prices            MaterialPrice[]
+  professionals     Professional[]
+
+  @@index([countryCode])
+}
+
+model Project {
+  id             String          @id @default(cuid())
+  ownerId        String
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  regionId       String
+  region         Region          @relation(fields: [regionId], references: [id])
+  currency       String
+  budgetTarget   Decimal?        @db.Decimal(18, 2)
+  budgetMin      Decimal?        @db.Decimal(18, 2)
+  budgetMax      Decimal?        @db.Decimal(18, 2)
+  /// Validated against RequirementsSchema (src/domain/generator/requirements.ts)
+  requirements   Json
+  description    String          @default("")
+  stage          DesignStage     @default(CONCEPT)
+  isSample       Boolean         @default(false)
+  currentVersionId String?       @unique
+  currentVersion DesignVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  site           Site?
+  versions       DesignVersion[] @relation("ProjectVersions")
+  documents      Document[]
+  reviewRequests ReviewRequest[]
+
+  @@index([ownerId, updatedAt])
+}
+
+model Site {
+  id            String   @id @default(cuid())
+  projectId     String   @unique
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  country       String
+  subdivision   String
+  city          String
+  addressLine   String?
+  latitude      Float?
+  longitude     Float?
+  /// Plot geometry in millimetres (rectangular plots in the MVP)
+  plotWidthMm   Int
+  plotDepthMm   Int
+  northAngleDeg Int      @default(0)
+  irregular     Boolean  @default(false)
+  surveyFileKey String?
+}
+
+model DesignVersion {
+  id                 String          @id @default(cuid())
+  projectId          String
+  project            Project         @relation("ProjectVersions", fields: [projectId], references: [id], onDelete: Cascade)
+  currentOf          Project?        @relation("CurrentVersion")
+  number             Int
+  label              String
+  /// What produced this version: concept | edit | materials | optimisation | assistant | restore
+  source             String
+  parentId           String?
+  model              Json
+  modelSchemaVersion Int
+  /// Server-computed estimate (CostEstimate) — never accepted from the client
+  estimate           Json
+  costEngineVersion  String
+  estimateLow        Decimal         @db.Decimal(18, 2)
+  estimateHigh       Decimal         @db.Decimal(18, 2)
+  grossFloorAreaM2   Float
+  createdById        String
+  createdBy          User            @relation(fields: [createdById], references: [id])
+  createdAt          DateTime        @default(now())
+
+  @@unique([projectId, number])
+}
+
+model Material {
+  id            String          @id
+  category      String
+  name          String
+  description   String
+  tier          String
+  unit          String
+  color         String
+  roughness     Float?
+  texture       String          @default("plain")
+  supplier      String?
+  environmental String?
+  prices        MaterialPrice[]
+
+  @@index([category])
+}
+
+model MaterialPrice {
+  id           String     @id @default(cuid())
+  materialId   String
+  material     Material   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  regionId     String
+  region       Region     @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  priceLow     Decimal    @db.Decimal(18, 2)
+  priceHigh    Decimal    @db.Decimal(18, 2)
+  availability String
+  dataStatus   DataStatus @default(sample)
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([materialId, regionId])
+}
+
+model Professional {
+  id                 String               @id @default(cuid())
+  category           ProfessionalCategory
+  name               String
+  regionId           String?
+  region             Region?              @relation(fields: [regionId], references: [id])
+  verificationStatus VerificationStatus   @default(UNVERIFIED)
+  licenceNumber      String?
+  createdAt          DateTime             @default(now())
+}
+
+model ReviewRequest {
+  id          String               @id @default(cuid())
+  projectId   String
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy User                 @relation(fields: [requestedById], references: [id])
+  category    ProfessionalCategory
+  versionId   String
+  message     String               @default("")
+  status      ReviewStatus         @default(REQUESTED)
+  createdAt   DateTime             @default(now())
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionId String?
+  kind      String
+  title     String
+  /// Object-storage key once file generation exists
+  fileKey   String?
+  createdAt DateTime @default(now())
+}

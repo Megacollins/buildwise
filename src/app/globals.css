@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * Buildwise design tokens.
+ * Dark, architectural interface: charcoal surfaces, fine borders, a restrained
+ * teal accent. Technical drawings are presented on a light "paper" sheet.
+ */
+:root {
+  --bg: #0b0d0e;
+  --surface: #121517;
+  --surface-2: #181c1f;
+  --surface-3: #1f2427;
+  --line: #242a2e;
+  --line-strong: #323a3f;
+  --text: #e8ebec;
+  --muted: #9ba4a9;
+  --faint: #677177;
+  --accent: #2fb5a4;
+  --accent-strong: #48cdbb;
+  --accent-soft: rgba(47, 181, 164, 0.12);
+  --accent-ink: #04201c;
+  --info: #6fa6d6;
+  --warn: #dca54c;
+  --warn-soft: rgba(220, 165, 76, 0.12);
+  --danger: #e0685e;
+  --danger-soft: rgba(224, 104, 94, 0.12);
+  --ok: #58b87a;
+  --ok-soft: rgba(88, 184, 122, 0.12);
+  --paper: #f3f1ec;
+  --ink: #1d2124;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+html { color-scheme: dark; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Subtle drafting-grid texture used behind hero and plan canvases */
+.grid-texture {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.animate-fade-up { animation: fade-up 0.35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Print: only the active drawing sheet */
+@media print {
+  @page { size: A3 landscape; margin: 8mm; }
+  html, body { background: #fff !important; color: #000; }
+  body * { visibility: hidden; }
+  .print-sheet, .print-sheet * { visibility: visible; }
+  .print-sheet { position: absolute; inset: 0; box-shadow: none !important; border-radius: 0 !important; }
+  .no-print { display: none !important; }
+}
