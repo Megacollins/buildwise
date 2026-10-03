@@ -17,8 +17,6 @@ const required = (message: string) => z.string({ error: message }).min(1, messag
 const Production = Base.extend({
   APP_URL: z.string({ error: "APP_URL is required in production (used for links in emails)" })
     .url("APP_URL must be a full URL").refine((u) => u.startsWith("https://"), "APP_URL must use https"),
-  RESEND_API_KEY: required("RESEND_API_KEY is required in production (verification and reset emails)"),
-  EMAIL_FROM: required("EMAIL_FROM is required in production, e.g. Buildwise <no-reply@yourdomain.com>"),
   CRON_SECRET: required("CRON_SECRET is required in production").refine((v) => v.length >= 32, "CRON_SECRET must be at least 32 characters"),
 });
 
@@ -28,6 +26,11 @@ export function validateEnv() {
   if (!result.success) {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration:\n${problems}\nSee .env.example and docs/DEPLOYMENT.md.`);
+  }
+  // Email is not required to run: sign-in works and verification is a banner, not a gate.
+  // Without it, verification and password-reset emails are not sent — say so loudly at startup.
+  if (production && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) {
+    console.warn("[env] EMAIL NOT CONFIGURED: set RESEND_API_KEY and EMAIL_FROM. Verification and password-reset emails will not be sent until you do.");
   }
   return result.data;
 }
