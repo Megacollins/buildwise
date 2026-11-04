@@ -9,6 +9,10 @@ estimate are all derived from that one model.
 > Status: MVP foundation (Phase 1). All regional prices are **sample data** and every concept is a
 > **concept design** — not construction documentation. The UI says so wherever it matters.
 
+> **Construction Desk on Switch** — a Switch room where a Claude agent proposes priced design
+> changes and the owner approves them in Buildwise before anything is saved. Setup and walkthrough:
+> [`docs/CONSTRUCTION-DESK.md`](docs/CONSTRUCTION-DESK.md).
+
 ## Quick start
 
 Requirements: Node 20+ (tested on Node 26), npm.
