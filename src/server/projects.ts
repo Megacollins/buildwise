@@ -110,7 +110,7 @@ export async function listProjectsForUser(userId: string) {
 }
 export type ProjectSummary = Awaited<ReturnType<typeof listProjectsForUser>>[number];
 
-async function estimateFor(model: BuildingModel, regionId: string) {
+export async function estimateFor(model: BuildingModel, regionId: string) {
   const region = await getRegion(regionId);
   if (!region) throw new Error(`Unknown region ${regionId}`);
   const catalog = await getRegionalCatalog(regionId);
@@ -182,9 +182,19 @@ export async function createProject(opts: {
  * Consecutive material swaps within a few minutes are folded into one version
  * so the history stays readable.
  */
-export async function applyProjectOp(projectId: string, userId: string, op: ModelOp, source = "edit", label?: string) {
+export class StaleVersionError extends Error {}
+
+export async function applyProjectOp(
+  projectId: string, userId: string, op: ModelOp, source = "edit", label?: string,
+  /**
+   * fold: allow merging consecutive material swaps into one version (default true).
+   * expectedVersionId: only apply if this is still the current version (else StaleVersionError).
+   */
+  opts: { fold?: boolean; expectedVersionId?: string } = {},
+) {
   const project = await getProjectForUser(projectId, userId);
   if (!project) throw new NotFoundError();
+  if (opts.expectedVersionId && project.currentVersionId !== opts.expectedVersionId) throw new StaleVersionError();
   let model: BuildingModel;
   try {
     model = applyOp(project.model, op);
@@ -202,7 +212,7 @@ export async function applyProjectOp(projectId: string, userId: string, op: Mode
   const current = project.currentVersion!;
   const latest = await db.designVersion.findFirst({ where: { projectId }, orderBy: { number: "desc" }, select: { id: true, number: true } });
 
-  const fold = op.kind === "selection" && current.source === "materials" && latest?.id === current.id
+  const fold = (opts.fold ?? true) && op.kind === "selection" && current.source === "materials" && latest?.id === current.id
     && current.number > 1 && Date.now() - current.createdAt.getTime() < 5 * 60_000;
 
   const data = {
@@ -214,18 +224,21 @@ export async function applyProjectOp(projectId: string, userId: string, op: Mode
     const prevLabel = current.label.startsWith("Finishes: ") ? current.label : `Finishes: ${current.label}`;
     await db.designVersion.update({ where: { id: current.id }, data: { ...data, label: `${prevLabel}; ${versionLabel}`.slice(0, 180) } });
     await db.project.update({ where: { id: projectId }, data: { updatedAt: new Date() } });
-  } else {
-    await db.$transaction(async (tx) => {
-      const v = await tx.designVersion.create({
-        data: {
-          ...data, projectId, number: (latest?.number ?? 0) + 1, label: versionLabel.slice(0, 180),
-          source: op.kind === "selection" ? "materials" : source, parentId: current.id, createdById: userId,
-        },
-      });
-      await tx.project.update({ where: { id: projectId }, data: { currentVersionId: v.id } });
-    });
+    return { ok: true as const, estimate, versionId: current.id };
   }
-  return { ok: true as const, estimate };
+  const versionId = await db.$transaction(async (tx) => {
+    const v = await tx.designVersion.create({
+      data: {
+        ...data, projectId, number: (latest?.number ?? 0) + 1, label: versionLabel.slice(0, 180),
+        source: op.kind === "selection" && opts.fold !== false ? "materials" : source, parentId: current.id, createdById: userId,
+      },
+    });
+    // Conditional switch: if another change landed meanwhile, the version swap doesn't happen.
+    const moved = await tx.project.updateMany({ where: { id: projectId, currentVersionId: current.id }, data: { currentVersionId: v.id } });
+    if (moved.count !== 1) throw new StaleVersionError();
+    return v.id;
+  });
+  return { ok: true as const, estimate, versionId };
 }
 
 export async function listVersions(projectId: string, userId: string) {

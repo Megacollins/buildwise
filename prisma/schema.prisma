@@ -141,37 +141,39 @@ model Region {
 }
 
 model Project {
-  id             String          @id @default(cuid())
-  ownerId        String
-  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name           String
-  regionId       String
-  region         Region          @relation(fields: [regionId], references: [id])
-  currency       String
-  budgetTarget   Decimal?        @db.Decimal(18, 2)
-  budgetMin      Decimal?        @db.Decimal(18, 2)
-  budgetMax      Decimal?        @db.Decimal(18, 2)
+  id               String          @id @default(cuid())
+  ownerId          String
+  owner            User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name             String
+  regionId         String
+  region           Region          @relation(fields: [regionId], references: [id])
+  currency         String
+  budgetTarget     Decimal?        @db.Decimal(18, 2)
+  budgetMin        Decimal?        @db.Decimal(18, 2)
+  budgetMax        Decimal?        @db.Decimal(18, 2)
   /// Validated against RequirementsSchema (src/domain/generator/requirements.ts)
-  requirements   Json
-  description    String          @default("")
-  stage          DesignStage     @default(CONCEPT)
-  isSample       Boolean         @default(false)
-  currentVersionId String?       @unique
-  currentVersion DesignVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  site           Site?
-  versions       DesignVersion[] @relation("ProjectVersions")
-  documents      Document[]
-  reviewRequests ReviewRequest[]
+  requirements     Json
+  description      String          @default("")
+  stage            DesignStage     @default(CONCEPT)
+  isSample         Boolean         @default(false)
+  currentVersionId String?         @unique
+  currentVersion   DesignVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  site             Site?
+  versions         DesignVersion[] @relation("ProjectVersions")
+  documents        Document[]
+  reviewRequests   ReviewRequest[]
+  agentKeys        AgentKey[]
+  changeRequests   ChangeRequest[]
 
   @@index([ownerId, updatedAt])
 }
 
 model Site {
-  id            String   @id @default(cuid())
-  projectId     String   @unique
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String  @id @default(cuid())
+  projectId     String  @unique
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   country       String
   subdivision   String
   city          String
@@ -181,16 +183,16 @@ model Site {
   /// Plot geometry in millimetres (rectangular plots in the MVP)
   plotWidthMm   Int
   plotDepthMm   Int
-  northAngleDeg Int      @default(0)
-  irregular     Boolean  @default(false)
+  northAngleDeg Int     @default(0)
+  irregular     Boolean @default(false)
   surveyFileKey String?
 }
 
 model DesignVersion {
-  id                 String          @id @default(cuid())
+  id                 String   @id @default(cuid())
   projectId          String
-  project            Project         @relation("ProjectVersions", fields: [projectId], references: [id], onDelete: Cascade)
-  currentOf          Project?        @relation("CurrentVersion")
+  project            Project  @relation("ProjectVersions", fields: [projectId], references: [id], onDelete: Cascade)
+  currentOf          Project? @relation("CurrentVersion")
   number             Int
   label              String
   /// What produced this version: concept | edit | materials | optimisation | assistant | restore
@@ -201,12 +203,12 @@ model DesignVersion {
   /// Server-computed estimate (CostEstimate) — never accepted from the client
   estimate           Json
   costEngineVersion  String
-  estimateLow        Decimal         @db.Decimal(18, 2)
-  estimateHigh       Decimal         @db.Decimal(18, 2)
+  estimateLow        Decimal  @db.Decimal(18, 2)
+  estimateHigh       Decimal  @db.Decimal(18, 2)
   grossFloorAreaM2   Float
   createdById        String
-  createdBy          User            @relation(fields: [createdById], references: [id])
-  createdAt          DateTime        @default(now())
+  createdBy          User     @relation(fields: [createdById], references: [id])
+  createdAt          DateTime @default(now())
 
   @@unique([projectId, number])
 }
@@ -255,16 +257,16 @@ model Professional {
 }
 
 model ReviewRequest {
-  id          String               @id @default(cuid())
-  projectId   String
-  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String               @id @default(cuid())
+  projectId     String
+  project       Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requestedById String
-  requestedBy User                 @relation(fields: [requestedById], references: [id])
-  category    ProfessionalCategory
-  versionId   String
-  message     String               @default("")
-  status      ReviewStatus         @default(REQUESTED)
-  createdAt   DateTime             @default(now())
+  requestedBy   User                 @relation(fields: [requestedById], references: [id])
+  category      ProfessionalCategory
+  versionId     String
+  message       String               @default("")
+  status        ReviewStatus         @default(REQUESTED)
+  createdAt     DateTime             @default(now())
 }
 
 model Document {
@@ -277,4 +279,70 @@ model Document {
   /// Object-storage key once file generation exists
   fileKey   String?
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Construction Desk (Switch integration). Additive: no existing table changes.
+// ---------------------------------------------------------------------------
+
+/// A revocable key that lets one Switch agent act on ONE project. Only the SHA-256 hash is stored.
+model AgentKey {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  /// First characters of the key, for recognising it in the UI (not secret on its own)
+  prefix      String
+  keyHash     String    @unique
+  createdById String
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  @@index([projectId])
+}
+
+/// Lifecycle of a proposed design change. Only the project owner can approve or reject.
+enum ChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLYING
+  APPLIED
+  FAILED
+  STALE
+}
+
+/// A proposed design change and, once decided, its decision record.
+model ChangeRequest {
+  id               String       @id @default(cuid())
+  projectId        String
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// "op" (a validated ModelOp) or "design" (a regenerated concept)
+  kind             String
+  /// The ModelOp, or { requirements, conceptKey }
+  payload          Json
+  summary          String
+  /// What was asked in the room, as relayed by the agent (untrusted text, display only)
+  requestText      String       @default("")
+  /// Where it came from, e.g. "switch"; and the room name the agent reported (display only)
+  requestedVia     String
+  roomRef          String?
+  agentKeyId       String?
+  idempotencyKey   String?
+  /// Design version the proposal was computed against; applying requires it to still be current
+  baseVersionId    String
+  /// Full before/after comparison (see src/domain/changes/compare.ts)
+  comparison       Json
+  status           ChangeStatus @default(PENDING)
+  decidedById      String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  appliedVersionId String?
+  failureReason    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, createdAt])
 }
