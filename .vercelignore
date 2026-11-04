@@ -1,0 +1,6 @@
+# Never upload local secrets or build output with `vercel deploy`.
+.env*
+.next
+node_modules
+**/node_modules
+.vercel/.env*
