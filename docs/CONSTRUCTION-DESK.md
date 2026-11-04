@@ -72,7 +72,7 @@ npm run db:seed
 npm run dev -- -p 3210
 ```
 
-Leave the dev server running. The demo account's credentials are in `prisma/seed.ts`.
+Leave the dev server running. To sign in locally, use **Sign in as the local demo user** on the sign-in page (the live site uses Sign in with Google).
 
 ### 2. The demo project, key and MCP connector
 

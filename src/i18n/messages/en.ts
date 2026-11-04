@@ -53,6 +53,8 @@ export const en = {
   "auth.submitSignUp": "Create account",
   "auth.noAccount": "New to Buildwise?",
   "auth.haveAccount": "Already have an account?",
+  "auth.continueWithGoogle": "Continue with Google",
+  "auth.googleNote": "New here? Continuing with Google creates your account.",
   "auth.sampleNote": "Your account starts with a sample project so you can explore every feature.",
 
   "dash.greeting": "Welcome, {name}",

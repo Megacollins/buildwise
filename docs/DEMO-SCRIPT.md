@@ -1,7 +1,7 @@
 # Construction Desk — demo script (about 3 minutes)
 
 Before recording: `npm run desk:demo -- http://localhost:3210`, create the room from the template
-with the printed project name, sign in to Buildwise as the owner in a separate browser window.
+with the printed project name, sign in to Buildwise as the owner ("Sign in as the local demo user" locally, Google on the live site) in a separate browser window.
 
 | # | Time | Screen | Say / do |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 # Deploying Buildwise
 
-Recommended stack: **Vercel** (app) + **Neon** (managed PostgreSQL) + **Resend** (email).
+Recommended stack: **Vercel** (app) + **Neon** (managed PostgreSQL) + **Google** (sign-in).
 All three have free tiers suitable for a private beta. Other Node hosts work too — the app is a
 standard Next.js server; see "Other hosts" below.
 
@@ -18,13 +18,19 @@ Push this repository to a **private** GitHub repository. `.env` is git-ignored a
 3. Backups: Neon keeps point-in-time restore history; the window depends on your plan. Check it
    meets your needs before real users arrive, and test a restore once.
 
-## 3. Email — Resend
+## 3. Sign-in — Google
 
-1. Add and verify your domain in Resend (it gives you DNS records: SPF, DKIM).
-2. Create an API key → `RESEND_API_KEY`.
-3. Choose a sender on that domain → `EMAIL_FROM`, e.g. `Buildwise <no-reply@yourdomain.com>`.
+Google is the only way to sign in.
 
-Without a verified domain, confirmation and reset emails will land in spam or be rejected.
+1. Google Cloud Console → **APIs & Services → OAuth consent screen**: External, app name "Buildwise",
+   your support email; scopes `openid`, `email`, `profile` (all non-sensitive). **Publish** the app
+   so any Google account can sign in (while "Testing", only listed test users can).
+2. **Credentials → Create credentials → OAuth client ID → Web application.** Authorised redirect URI:
+   `https://yourdomain.com/api/auth/google/callback` (add `http://localhost:3000/api/auth/google/callback`
+   too if you want Google sign-in locally).
+3. Copy the client ID and secret → `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+
+Accounts created before Google sign-in are linked on first Google sign-in with the same (Google-verified) email.
 
 ## 4. App — Vercel
 
@@ -39,8 +45,8 @@ Without a verified domain, confirmation and reset emails will land in spam or be
    | `DATABASE_URL` | Neon pooled connection string |
    | `DIRECT_DATABASE_URL` | Neon direct connection string |
    | `APP_URL` | `https://yourdomain.com` (must be https) |
-   | `RESEND_API_KEY` | from Resend |
-   | `EMAIL_FROM` | `Buildwise <no-reply@yourdomain.com>` |
+   | `GOOGLE_CLIENT_ID` | from Google Cloud Console |
+   | `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
    | `CRON_SECRET` | 64 random hex characters (`openssl rand -hex 32`) |
 
    The server **refuses to start** if any of these are missing or invalid, and logs exactly which.
@@ -50,7 +56,7 @@ Without a verified domain, confirmation and reset emails will land in spam or be
    DATABASE_URL="<pooled url>" DIRECT_DATABASE_URL="<direct url>" npx prisma db seed
    ```
 
-   On a non-local database the seed **does not** create the demo account (its password is public).
+   On a non-local database the seed **does not** create the demo account.
    Re-run the seed whenever `src/data` changes; it is idempotent.
 5. Add your custom domain in Vercel and point DNS at it. HTTPS is automatic.
 
@@ -60,7 +66,7 @@ Without a verified domain, confirmation and reset emails will land in spam or be
   monitor (e.g. Better Stack or UptimeRobot) at it.
 - **Logs:** server errors are written as one-line JSON (`"level":"error"`) with a `digest` that matches
   the reference number shown to users on error pages. Search for it in Vercel → Logs.
-- **Smoke test:** sign up with a real inbox, confirm the email, reset the password, create a project.
+- **Smoke test:** continue with Google (new account gets the sample project), sign out, sign in again, create a project.
 
 ## Pre-launch checklist (not code)
 

@@ -4,17 +4,12 @@
  *
  * Reference data (regions, materials) is always seeded and is safe to re-run.
  *
- * The demo account has a publicly known password, so it is ONLY created when the
- * database is on this machine (localhost), or when SEED_DEMO=true is set explicitly.
- * It is never created on a hosted/production database by accident.
- *
- * Local demo account (development only):
- *   email:    demo@buildwise.test
- *   password: DEMO_PASSWORD below
+ * The demo account is ONLY created when the database is on this machine (localhost),
+ * or when SEED_DEMO=true is set explicitly. It has no password: locally, the sign-in page
+ * offers "Sign in as the local demo user" (development builds on a local database only).
  */
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
 import { PrismaClient, type Prisma } from "../src/generated/prisma/client";
 import { REGIONS } from "../src/data/regions";
 import { MATERIALS, defaultSelections } from "../src/data/materials";
@@ -26,7 +21,6 @@ import { estimateCost, COST_ENGINE_VERSION } from "../src/domain/cost/engine";
 import { MODEL_SCHEMA_VERSION, type BuildingModel } from "../src/domain/model/types";
 
 export const DEMO_EMAIL = "demo@buildwise.test";
-export const DEMO_PASSWORD = "buildwise-demo-2026";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const json = (v: unknown) => v as Prisma.InputJsonValue;
@@ -65,7 +59,7 @@ async function main() {
 
   const user = await db.user.upsert({
     where: { email: DEMO_EMAIL },
-    create: { email: DEMO_EMAIL, name: "Demo User", passwordHash: await bcrypt.hash(DEMO_PASSWORD, 12), emailVerifiedAt: new Date() },
+    create: { email: DEMO_EMAIL, name: "Demo User", emailVerifiedAt: new Date() },
     update: { emailVerifiedAt: new Date() },
   });
   await db.project.deleteMany({ where: { ownerId: user.id, isSample: true } });

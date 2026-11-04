@@ -68,7 +68,10 @@ model User {
   id                String            @id @default(cuid())
   email             String            @unique
   name              String
-  passwordHash      String
+  /// Legacy: accounts created before Google sign-in. No longer used to sign in.
+  passwordHash      String?
+  /// Google account subject ("sub"); set on first Google sign-in
+  googleId          String?           @unique
   emailVerifiedAt   DateTime?
   passwordChangedAt DateTime?
   locale            String            @default("en")

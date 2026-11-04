@@ -27,10 +27,11 @@ npm run dev                # http://localhost:3000
 
 Using your own PostgreSQL instead: set `DATABASE_URL` in `.env` (see `.env.example`) and skip `db:start`.
 
-**Demo account (local only):** credentials are in [`prisma/seed.ts`](prisma/seed.ts) (`DEMO_EMAIL` /
-`DEMO_PASSWORD`). New sign-ups also receive their own copy of the sample project.
+**Signing in:** Buildwise uses **Sign in with Google** only (set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, see
+`.env.example`). Running locally without Google, the sign-in page offers **Sign in as the local demo user**
+(development builds on a local database only). New accounts start with their own copy of the sample project.
 
-**Deploying:** see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (Vercel + Neon + Resend, or any Node host).
+**Deploying:** see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (Vercel + Neon + a Google OAuth client, or any Node host).
 
 Other scripts: `npm test` (domain test suite), `npm run typecheck`, `npm run lint`, `npm run build`, `npm run check:domain`
 (generates concepts for every region and prints layouts and cost ranges — a quick domain sanity check).
@@ -83,12 +84,11 @@ Key rules the code follows:
 
 ## Accounts & security
 
-- Email verification (required before requesting professional review), password reset (30-minute,
-  single-use links; the newest link revokes older ones), change password (signs out other devices).
-- Tokens and sessions are stored only as SHA-256 hashes; passwords use bcrypt.
-- Rate limits stored in Postgres (work across instances): sign-in 8 per account / 30 per IP per 15 min,
-  sign-up 10 per IP per hour, reset requests 3 per account / 10 per IP per hour.
-- Reset requests answer identically whether or not an account exists; sign-in timing is equalised.
+- Sign in with Google only (OpenID Connect code flow with PKCE, state and nonce). The ID token's issuer,
+  audience, expiry, nonce and **verified email** are checked; an account is matched by Google ID, or
+  linked by verified email for accounts created before Google sign-in. Buildwise keeps no passwords.
+- Sessions are Buildwise's own: opaque tokens in an httpOnly cookie, stored only as SHA-256 hashes.
+- Rate limits stored in Postgres (work across instances), e.g. 30 Google sign-in starts per IP per 15 min.
 - Security headers: CSP, frame denial, nosniff, referrer and permissions policies, HSTS in production.
 - Email: set `RESEND_API_KEY`, `EMAIL_FROM` and `APP_URL` in production. In development, emails
   (with their links) are printed to the terminal running `npm run dev`.

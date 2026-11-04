@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/shell/AuthForm";
 import { getI18n } from "@/server/i18n";
 import { getCurrentUser } from "@/server/auth";
+import { googleConfigured } from "@/server/google";
+import { localDemoSignInAvailable } from "@/server/local-demo";
 
 export const metadata: Metadata = { title: "Create account" };
 
@@ -13,7 +15,7 @@ export default async function SignupPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold tracking-tight">{t("auth.signUpTitle")}</h1>
       <p className="mt-2 text-[13.5px] text-muted">{t("auth.sampleNote")}</p>
-      <div className="mt-8"><AuthForm mode="signup" /></div>
+      <div className="mt-8"><AuthForm googleReady={googleConfigured()} localDemo={localDemoSignInAvailable()} /></div>
     </div>
   );
 }

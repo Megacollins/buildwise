@@ -4,7 +4,6 @@ import { getI18n } from "@/server/i18n";
 import { Card, CardHeader, PageHeader, Badge } from "@/components/ui";
 import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import { LOCALES } from "@/i18n/config";
-import { ChangePasswordForm, ResendVerificationButton } from "@/components/shell/AccountForms";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -20,14 +19,12 @@ export default async function SettingsPage() {
           <div><dt className="text-faint">Name</dt><dd>{user.name}</dd></div>
           <div>
             <dt className="text-faint">Email</dt>
-            <dd className="flex flex-wrap items-center gap-2">{user.email} {user.emailVerifiedAt ? <Badge tone="ok">Confirmed</Badge> : <Badge tone="warn">Not confirmed</Badge>}</dd>
+            <dd className="flex flex-wrap items-center gap-2">{user.email} {user.googleId ? <Badge tone="ok">Google account</Badge> : <Badge>Local demo</Badge>}</dd>
           </div>
         </dl>
-        {!user.emailVerifiedAt && <div className="px-5 pb-5"><ResendVerificationButton /></div>}
-      </Card>
-      <Card>
-        <CardHeader title="Password" subtitle="Changing your password signs you out on all other devices." />
-        <div className="p-5"><ChangePasswordForm /></div>
+        <p className="px-5 pb-5 text-[12.5px] text-muted">
+          {user.googleId ? "You sign in with Google. Your name and email come from your Google account." : "This is the local demo account, available only on a development machine."}
+        </p>
       </Card>
       <Card>
         <CardHeader title={`${t("field.language")} & ${t("field.units").toLowerCase()}`} subtitle="Applies to menus, labels, drawings and number formats. Geometry is always stored in millimetres." />

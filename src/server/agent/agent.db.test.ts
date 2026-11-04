@@ -20,7 +20,7 @@ const sp = SAMPLE_PROJECTS.find((p) => p.regionId === "ng-la-lagos")!;
 const userIds: string[] = [];
 
 async function makeOwner(tag: string) {
-  const u = await db.user.create({ data: { email: `agent-test-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`, name: "Agent test", passwordHash: "not-a-real-hash" } });
+  const u = await db.user.create({ data: { email: `agent-test-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`, name: "Agent test" } });
   userIds.push(u.id);
   const project = await createProject({
     userId: u.id, name: `Agent test ${tag}`, regionId: sp.regionId, plot: sp.plot, requirements: sp.requirements,

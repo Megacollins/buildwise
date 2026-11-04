@@ -189,7 +189,8 @@ in the database (seeded from `src/data`), so verified datasets can replace sampl
 ## 5. Server, auth and security (`src/server`)
 
 - Opaque session tokens in an httpOnly, SameSite=Lax cookie; only the SHA-256 hash is stored.
-  Passwords are bcrypt-hashed. Sign-in errors don't reveal whether an email exists.
+  Sign-in is Google only (`src/server/google.ts`: OIDC code flow + PKCE, claims checked in
+  `google-claims.ts`, verified email required); Buildwise stores no passwords.
 - `src/proxy.ts` performs an optimistic redirect for signed-out visitors; **authorisation is enforced
   in the data layer** (`getProjectForUser`, `loadWorkspace`, and every server action filters by owner).
 - All server-action input is validated with Zod (`ModelOpSchema`, `RequirementsSchema`, etc.).
