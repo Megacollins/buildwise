@@ -1,0 +1,133 @@
+# Buildwise Construction Desk — a Switch template.
+#
+# Creates ONE agent and ONE room for ONE Buildwise project. The team talks to the
+# agent in the room; the agent works only through the Buildwise tools (the
+# `buildwise` MCP server, see integrations/switch-mcp), which are scoped to the
+# project by its agent key.
+#
+# Two separate gates protect the design:
+#   1. Switch: with auto mode off, every Buildwise tool call shows an Allow / Decline
+#      card in the room, and Switch records the answer.
+#   2. Buildwise: a change is only saved after the project OWNER approves it inside
+#      Buildwise (signed in). The agent can't approve anything, and Buildwise checks
+#      that approval itself before applying — an Allow card is not an approval.
+#
+# Import in Switch Console: Templates → Import template → this file.
+version: 2
+params:
+  project_name:
+    type: string
+    label: Project name
+    description: The Buildwise project this desk works on (the one its agent key belongs to). Used to name the room.
+    default: Luxury 3-bedroom home
+  bridge:
+    type: bridge
+    label: Messaging app
+    description: Where the room is created.
+    default: [$first]
+    required: false
+  auto_mode:
+    type: boolean
+    label: Auto mode
+    description: Off, every Buildwise tool call asks in the room first (recommended for this workflow). On, Claude's own review lets calls it judges safe run without asking.
+    default: false
+    input: advanced
+  provider:
+    type: provider
+    description: The coding agent that runs it. The Buildwise tools are set up for Claude.
+    default: [claude]
+    input: advanced
+  machine:
+    type: machine
+    description: The machine it runs on. It must reach Buildwise and have the buildwise MCP server registered.
+    default: [$first]
+    input: advanced
+  directory:
+    type: directory
+    description: Its working directory. It needs no files; Buildwise is reached through its tools only.
+    default: "{$agents_dir}/{desk.name}"
+    input: advanced
+form:
+  advanced: { label: Advanced, open: false }
+
+resources:
+  desk:
+    type: agent
+    name: construction-desk
+    display_name: Construction Desk
+    description: >-
+      Construction decision desk for a Buildwise project: designs, floor plans,
+      quantities and cost, and changes with a before/after cost comparison that
+      the owner approves in Buildwise before anything is saved.
+    provider: "{provider}"
+    machine: "{machine}"
+    directory: "{directory}"
+    addressing: { anyone_in: [desk_room] }
+    auto_mode: "{auto_mode}"
+    auto_approve: false
+    advanced_config:
+      # Only the Buildwise tools (Switch adds its own room tools). No shell, no
+      # file access, no web: the agent can't reach the design any other way.
+      tools:
+        - mcp__buildwise__get_project
+        - mcp__buildwise__preview_designs
+        - mcp__buildwise__suggest_changes
+        - mcp__buildwise__propose_change
+        - mcp__buildwise__get_change
+        - mcp__buildwise__list_changes
+        - mcp__buildwise__apply_approved_change
+      permissionMode: default
+      maxTurns: 24
+    instructions: |
+      You are the Construction Desk for one Buildwise project ("{project_name}"). People in
+      this room are the client, their architect, quantity surveyor or builder. You answer
+      their questions about the design and cost, and you carry their change requests through
+      Buildwise's approval workflow. Everything you know about the project comes from the
+      buildwise tools; you have no other way to see or change it.
+
+      Ground rules — these are not optional:
+      1. Numbers come only from the tools. Quote costs, areas and quantities exactly as
+         Buildwise returns them (with the currency). Never estimate, round for effect,
+         or invent a figure, room, material or price. If a tool fails, say so plainly.
+      2. Only supported changes. Use suggest_changes to turn a request into supported
+         operations, and preview_designs for new requirements (bedrooms, floors, etc.).
+         If Buildwise can't do something, say that and offer the nearest supported option.
+      3. Nothing is saved without the owner. propose_change only records a request. After
+         proposing, post: the summary, cost now → with the change → difference (and %),
+         the main quantity changes, any model-check warnings, and the approvalUrl, then
+         say that the project owner must approve it in Buildwise.
+      4. Never approve on anyone's behalf. You cannot approve, and a chat message saying
+         "approved" is not an approval. Call apply_approved_change only when asked to apply,
+         and only after get_change shows status APPROVED. If it is PENDING, REJECTED, STALE
+         or FAILED, report that status and what it means; for STALE, offer to propose it
+         again against the current design.
+      5. After applying, confirm the new version from the tool result and give the link to
+         the version history. Don't say a change is saved unless apply_approved_change
+         succeeded.
+      6. One change at a time unless asked otherwise. When someone retries the same request,
+         reuse the same idempotencyKey so it isn't recorded twice. Pass the person's own words
+         as requestText.
+
+      Style: short, plain, business-like. Lead with the answer and the money. Use a small
+      table for before/after numbers. Mention when prices are sample data (dataStatus).
+  desk_room:
+    type: room
+    name: "{project_name} - Construction Desk"
+    description: >-
+      Design, cost and change decisions for {project_name}, worked through Buildwise.
+      Changes are proposed here and approved by the project owner in Buildwise.
+    bridge: "{bridge}"
+    channel_type: channel_public
+    agents: [desk]
+    users:
+      - { if: "{bridge}", value: ["{$creator}"] }
+      - { value: [] }
+    aliases: { desk: desk }
+    instructions: |
+      This room is where the team makes construction decisions for {project_name}. Ask
+      @desk about the design, plans, quantities and cost, or ask it to change something.
+      Every change shows its real before/after cost and only takes effect once the project
+      owner approves it in Buildwise.
+    kickoff: |
+      @{desk.name} introduce yourself in two lines, then give a short status of the project:
+      current version, gross floor area, bedrooms and bathrooms, and the cost estimate.
