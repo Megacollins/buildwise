@@ -176,6 +176,7 @@ describe("approval and application", () => {
     expect(p.currentVersionId).toBe(r1.change.appliedVersionId);
     expect(p.currentVersion!.label).toMatch(/^Approved change: /);
     expect(p.currentVersion!.source).toBe("switch");
+    expect(r1.version).toMatchObject({ id: p.currentVersionId, number: p.currentVersion!.number });
     // The saved estimate is the one the owner approved.
     expect(p.estimate.expected).toBeCloseTo(change.comparison.cost.after.expected, 1);
     // Repeating the call is harmless.

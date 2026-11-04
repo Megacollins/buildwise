@@ -97,10 +97,11 @@ export function compareSnapshots(before: Snapshot, after: Snapshot): Comparison 
   lines.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta) || x.id.localeCompare(y.id));
 
   const report = validateModel(after.model);
-  const delta = r2(costA.expected - costB.expected);
+  // From the unrounded estimates, so it matches the cost deltas quoted elsewhere (e.g. suggestions).
+  const delta = r2(ea.expected - eb.expected);
   return {
     currency: ea.currency,
-    cost: { before: costB, after: costA, delta, deltaPct: costB.expected ? r2((delta / costB.expected) * 100) : 0 },
+    cost: { before: costB, after: costA, delta, deltaPct: eb.expected ? r2(((ea.expected - eb.expected) / eb.expected) * 100) : 0 },
     grossFloorArea: { before: r2(eb.grossFloorArea), after: r2(ea.grossFloorArea), delta: r2(ea.grossFloorArea - eb.grossFloorArea) },
     rooms,
     quantities,

@@ -102,7 +102,7 @@ resources:
          and only after get_change shows status APPROVED. If it is PENDING, REJECTED, STALE
          or FAILED, report that status and what it means; for STALE, offer to propose it
          again against the current design.
-      5. After applying, confirm the new version from the tool result and give the link to
+      5. After applying, confirm the new version by its number ("version 4") from the tool result and give the link to
          the version history. Don't say a change is saved unless apply_approved_change
          succeeded.
       6. One change at a time unless asked otherwise. When someone retries the same request,

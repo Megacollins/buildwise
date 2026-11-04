@@ -238,6 +238,13 @@ export async function listChanges(ctx: AgentContext, base: string) {
 
 // ---- Apply (only after the owner approved in Buildwise) -----------------------
 
+/** The saved version, by its number as people see it in Buildwise. */
+async function versionView(versionId: string | null, base: string, projectId: string) {
+  if (!versionId) return null;
+  const v = await db.designVersion.findUnique({ where: { id: versionId }, select: { id: true, number: true, label: true } });
+  return v && { ...v, historyUrl: `${base}/app/projects/${projectId}/versions` };
+}
+
 /**
  * Applies an APPROVED change. Safe to repeat: an applied change returns its version.
  * Refuses anything not approved by the owner, and anything computed against a design
@@ -246,7 +253,7 @@ export async function listChanges(ctx: AgentContext, base: string) {
 export async function applyChange(ctx: AgentContext, base: string, changeId: string) {
   const cr = await db.changeRequest.findFirst({ where: { id: changeId, projectId: ctx.projectId } });
   if (!cr) throw new AgentError(404, "change_not_found", "No such change request on this project.");
-  if (cr.status === "APPLIED") return { alreadyApplied: true, change: changeView(cr, base, ctx.projectId) };
+  if (cr.status === "APPLIED") return { alreadyApplied: true, change: changeView(cr, base, ctx.projectId), version: await versionView(cr.appliedVersionId, base, ctx.projectId) };
   if (cr.status !== "APPROVED") {
     const why: Record<string, string> = {
       PENDING: "The project owner hasn't approved this change in Buildwise yet.",
@@ -260,7 +267,10 @@ export async function applyChange(ctx: AgentContext, base: string, changeId: str
 
   // Claim it, so two simultaneous apply calls can't both run.
   const claimed = await db.changeRequest.updateMany({ where: { id: cr.id, status: "APPROVED" }, data: { status: "APPLYING" } });
-  if (claimed.count !== 1) return getChange(ctx, base, cr.id).then((change) => ({ alreadyApplied: change.status === "APPLIED", change }));
+  if (claimed.count !== 1) {
+    const change = await getChange(ctx, base, cr.id);
+    return { alreadyApplied: change.status === "APPLIED", change, version: await versionView(change.appliedVersionId, base, ctx.projectId) };
+  }
 
   const finish = (data: Prisma.ChangeRequestUpdateInput) => db.changeRequest.update({ where: { id: cr.id }, data });
   try {
@@ -282,7 +292,7 @@ export async function applyChange(ctx: AgentContext, base: string, changeId: str
       versionId = await applyDesign(p, ctx.ownerId, cr.payload as { requirements: Requirements; conceptKey: "A" | "B" | "C" }, cr.summary, cr.baseVersionId);
     }
     const done = await finish({ status: "APPLIED", appliedVersionId: versionId, failureReason: null });
-    return { alreadyApplied: false, change: changeView(done, base, ctx.projectId) };
+    return { alreadyApplied: false, change: changeView(done, base, ctx.projectId), version: await versionView(versionId, base, ctx.projectId) };
   } catch (e) {
     if (e instanceof StaleVersionError) {
       await finish({ status: "STALE", failureReason: "Another change was saved at the same time." });
