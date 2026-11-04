@@ -32,11 +32,6 @@ params:
     description: Off, every Buildwise tool call asks in the room first (recommended for this workflow). On, Claude's own review lets calls it judges safe run without asking.
     default: false
     input: advanced
-  provider:
-    type: provider
-    description: The coding agent that runs it. The Buildwise tools are set up for Claude.
-    default: [claude]
-    input: advanced
   machine:
     type: machine
     description: The machine it runs on. It must reach Buildwise and have the buildwise MCP server registered.
@@ -59,7 +54,9 @@ resources:
       Construction decision desk for a Buildwise project: designs, floor plans,
       quantities and cost, and changes with a before/after cost comparison that
       the owner approves in Buildwise before anything is saved.
-    provider: "{provider}"
+    # Claude Code, named here rather than asked: the Buildwise MCP server is registered for it, and
+    # Switch Console's provider picker can't offer providers on Windows.
+    provider: claude
     machine: "{machine}"
     directory: "{directory}"
     addressing: { anyone_in: [desk_room] }
