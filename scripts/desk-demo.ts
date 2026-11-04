@@ -86,7 +86,9 @@ async function main() {
   process.stdout.write((r.stdout ?? "").replaceAll(key, "bwk_…"));
   process.stderr.write((r.stderr ?? "").replaceAll(key, "bwk_…"));
   if (r.status !== 0) throw new Error("Registering the MCP server failed (is Buildwise running at " + url + "?).");
-  console.log(`\nNext: in Switch Console, use the "Construction desk" template with project name "${name}".`);
+  // A room name Mattermost hasn't seen: re-using one makes Switch link to the old channel, where @desk isn't set up.
+  const stamp = new Date().toISOString().slice(5, 16).replace("T", " ");
+  console.log(`\nNext: in Switch Console, use the "Construction desk" template with project name "Desk demo ${stamp}".`);
 }
 
 main()

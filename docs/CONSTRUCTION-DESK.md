@@ -101,7 +101,10 @@ In Switch Console (opened from the Start menu / Applications, with Docker runnin
    **Create agent and room**.
 3. Open the room "*project* - Construction Desk".
 
-If an earlier "Construction Desk" agent exists, remove it first (agent names are unique).
+If an earlier "Construction Desk" agent exists, delete it first (agent page → gear → trash icon):
+agent names are unique. Give each new desk a room name you haven't used before — Mattermost
+refuses a duplicate channel, Switch then links the desk to the old channel, and the `@desk` alias
+isn't set up there (address it as `@construction-desk` instead).
 
 ### 4. The workflow
 
@@ -136,7 +139,11 @@ npm --prefix integrations/switch-mcp run smoke   # needs BUILDWISE_URL and BUILD
   Console's provider picker can't offer providers on Windows; the template has no kickoff message
   because Allow cards can't thread under a template kickoff in Mattermost ("Invalid RootId"). If
   "Use template" reports a timeout, check **Your Agents / Your Rooms** before retrying — the run
-  may have succeeded.
+  may have succeeded. Switch also adds a new agent to the workspace's standing channels (Town
+  Square, Off-Topic); the agent key still limits it to this one project.
+- The agent treats "apply only once APPROVED" as a hard rule and won't call
+  `apply_approved_change` on a pending change even when asked to; Buildwise's own refusal is
+  covered by `npm run test:db`.
 
 ## Where things are
 
