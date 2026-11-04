@@ -13,6 +13,10 @@
 #      that approval itself before applying — an Allow card is not an approval.
 #
 # Import in Switch Console: Templates → Import template → this file.
+#
+# No kickoff message: in Switch 0.31 a template kickoff has no real Mattermost post, so the
+# agent's Allow cards can't thread under it ("Invalid RootId") and its first tool call
+# stalls. The room starts quiet; the first person to @desk starts the work.
 version: 2
 params:
   project_name:
@@ -125,6 +129,3 @@ resources:
       @desk about the design, plans, quantities and cost, or ask it to change something.
       Every change shows its real before/after cost and only takes effect once the project
       owner approves it in Buildwise.
-    kickoff: |
-      @{desk.name} introduce yourself in two lines, then give a short status of the project:
-      current version, gross floor area, bedrooms and bathrooms, and the cost estimate.
